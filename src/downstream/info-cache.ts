@@ -54,9 +54,7 @@ export function adapterVersion(): string {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
     // dist/downstream/info-cache.js -> dist/../package.json
-    const pkg: unknown = JSON.parse(
-      readFileSync(join(here, "..", "..", "package.json"), "utf-8"),
-    );
+    const pkg: unknown = JSON.parse(readFileSync(join(here, "..", "..", "package.json"), "utf-8"));
     if (typeof pkg === "object" && pkg !== null) {
       const version = (pkg as Record<string, unknown>)["version"];
       if (typeof version === "string" && version !== "") return version;
@@ -84,9 +82,10 @@ export function intersectCapabilities(downstream: readonly string[]): string[] {
   return SUPPORTED_CWP_OPERATIONS.filter((operation) => advertised.has(operation));
 }
 
-function readCache(path: string, key: Omit<CacheEntry, "capabilities" | "chains">):
-  | DownstreamDescriptor
-  | undefined {
+function readCache(
+  path: string,
+  key: Omit<CacheEntry, "capabilities" | "chains">,
+): DownstreamDescriptor | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(path, "utf-8"));

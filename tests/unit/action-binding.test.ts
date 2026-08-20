@@ -158,7 +158,10 @@ describe("signed payload contents", () => {
   });
 
   it("carries no key Core would read as a spend amount", () => {
-    const payload = payloadFor("send-transaction", BASE_INPUT) as Record<string, unknown>;
+    const payload = payloadFor("send-transaction", BASE_INPUT) as unknown as Record<
+      string,
+      unknown
+    >;
     for (const field of ["amount", "amount_usd", "value", "total"]) {
       expect(field in payload).toBe(false);
     }

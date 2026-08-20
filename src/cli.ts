@@ -15,6 +15,7 @@ import type { Logger } from "./observability/logger.js";
 import { createLogger } from "./observability/logger.js";
 import { loadDownstreamConfig, loadInntrisConfig, receiptUrl } from "./config.js";
 import type { SpawnFn } from "./downstream/delegate.js";
+import type { CwpInvocationInput } from "./cwp/input.js";
 import type { FetchLike } from "./inntris/client.js";
 
 /**
@@ -102,10 +103,7 @@ function relayDownstream(
   if (result.exitCode === ExitCode.SUCCESS) {
     if (!parseable || typeof parsed !== "object" || parsed === null) {
       return {
-        body: errorResponse(
-          "Downstream wallet provider returned malformed JSON",
-          "INTERNAL_ERROR",
-        ),
+        body: errorResponse("Downstream wallet provider returned malformed JSON", "INTERNAL_ERROR"),
         exitCode: ExitCode.GENERAL_ERROR,
       };
     }
@@ -184,11 +182,40 @@ async function handlePassthrough(
   return relayDownstream(result, logger);
 }
 
+/**
+ * Read the CWP request, then run the authorisation sequence over it.
+ *
+ * Split from `authoriseAndDelegate` so the security-critical sequence — sign,
+ * verify, consume, recheck, spawn — can be driven directly over a caller-owned
+ * request object without stubbing any part of it.
+ */
 async function handleGated(
   deps: CliDependencies,
   logger: Logger,
   operation: string,
   deadline: Deadline,
+): Promise<StdoutResponse> {
+  const { parseCwpInput, readStdinBuffer } = await import("./cwp/input.js");
+  const raw = await readStdinBuffer(deps.stdin);
+  const input = parseCwpInput(raw);
+  return authoriseAndDelegate(deps, logger, operation, deadline, input);
+}
+
+/**
+ * The mandatory execution ordering for a gated operation.
+ *
+ *     sign → /verify → /verify-token(consume) → integrity recheck → spawn
+ *
+ * Every `return` and every `throw` before the final `delegate` call leaves the
+ * downstream wallet unspawned. There is no branch out of this function that
+ * reaches delegation without a consumed, action-bound approval.
+ */
+export async function authoriseAndDelegate(
+  deps: CliDependencies,
+  logger: Logger,
+  operation: string,
+  deadline: Deadline,
+  input: CwpInvocationInput,
 ): Promise<StdoutResponse> {
   if (!isGatedOperation(operation)) {
     throw ProtocolError.unsupported(`Unsupported operation: ${operation}`);
@@ -206,24 +233,18 @@ async function handleGated(
     enforce: true,
   });
 
-  const { assertDelegationIntegrity, parseCwpInput, readStdinBuffer } = await import(
-    "./cwp/input.js"
-  );
+  const { assertDelegationIntegrity } = await import("./cwp/input.js");
   const { buildWalletAction, invocationRefs } = await import("./inntris/action.js");
   const { buildSignedAction } = await import("./inntris/signing.js");
   const { InntrisCoreClient } = await import("./inntris/client.js");
 
-  // 1. Retain the original bytes and parse them exactly once.
-  const raw = await readStdinBuffer(deps.stdin);
-  const input = parseCwpInput(raw);
-
-  // 2. Derive both references from a single invocation UUID, and reuse them —
+  // 1. Derive both references from a single invocation UUID, and reuse them —
   //    together with the nonce, timestamp, and signed action derived from them
   //    — for every internal retry within this invocation.
   const invocationId = (deps.randomUUID ?? crypto.randomUUID.bind(crypto))();
   const { requestRef, executionRef } = invocationRefs(invocationId);
 
-  // 3. Commit to the exact request that will be delegated.
+  // 2. Commit to the exact request that will be delegated.
   const action = buildWalletAction({
     operation,
     input: input.parsed,
@@ -231,7 +252,7 @@ async function handleGated(
     downstreamProvider: downstreamConfig.providerName,
   });
 
-  // 4. Sign once. The signed action is built here and never rebuilt.
+  // 3. Sign once. The signed action is built here and never rebuilt.
   const signed = buildSignedAction({
     agentId: inntrisConfig.agentId,
     privateKeyBase64: inntrisConfig.privateKeyBase64,
@@ -250,7 +271,7 @@ async function handleGated(
       : { fetchImplementation: deps.fetchImplementation }),
   });
 
-  // 5. /verify then /verify-token(consume). Both must succeed before anything
+  // 4. /verify then /verify-token(consume). Both must succeed before anything
   //    downstream is spawned.
   const decision = await client.authoriseAndConsume({ signed, executionRef, deadline });
 
@@ -272,10 +293,10 @@ async function handleGated(
     `consumption=${receiptUrl(inntrisConfig.receiptBaseUrl, decision.consumptionAuditId)}`,
   );
 
-  // 6. Prove the request has not moved between authorisation and delegation.
+  // 5. Prove the request has not moved between authorisation and delegation.
   assertDelegationIntegrity(input, action.cwpInputHash);
 
-  // 7. Only now may the wallet run. The downstream slice absorbs whatever the
+  // 6. Only now may the wallet run. The downstream slice absorbs whatever the
   //    caller's ceiling left; a larger ceiling widens this step and nothing
   //    else.
   const timeoutMs = Math.min(

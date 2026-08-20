@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough, Readable, Writable } from "node:stream";
 
+import { computeActionHash } from "../src/inntris/signing.js";
 import type { SpawnFn } from "../src/downstream/delegate.js";
 import type { CliDependencies } from "../src/cli.js";
 
@@ -87,8 +88,7 @@ export function fakeSpawn(
       };
       calls.push(record);
 
-      const resolved =
-        typeof behaviour === "function" ? behaviour(args[0] ?? "") : behaviour;
+      const resolved = typeof behaviour === "function" ? behaviour(args[0] ?? "") : behaviour;
 
       if (resolved.error !== undefined) {
         setImmediate(() => child.emit("error", resolved.error));
@@ -137,7 +137,10 @@ export function fakeCore(handler: CoreHandler): FakeCore {
   const calls: CoreCall[] = [];
   const fetchImplementation = async (input: string, init: RequestInit): Promise<Response> => {
     const path = new URL(input).pathname.replace(/^\//u, "");
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    const body = JSON.parse(typeof init.body === "string" ? init.body : "{}") as Record<
+      string,
+      unknown
+    >;
     calls.push({ path, body });
     const result = await handler(path, body);
     return new Response(JSON.stringify(result.body), {
@@ -161,4 +164,126 @@ export function baseEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     INNTRIS_DOWNSTREAM_PROVIDER_NAME: "companion",
     ...overrides,
   };
+}
+
+export const DOWNSTREAM_BIN = new URL("./fixtures/wallet-downstream-stub", import.meta.url)
+  .pathname;
+
+export interface InvokeResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  json: Record<string, unknown>;
+}
+
+export interface InvokeOptions {
+  operation: string;
+  stdin?: string;
+  env?: NodeJS.ProcessEnv;
+  spawn?: FakeSpawn;
+  core?: FakeCore;
+  now?: () => Date;
+  clock?: () => number;
+  randomUUID?: () => string;
+}
+
+/** Drive the real CLI in-process with injected Core, spawn, and clocks. */
+export async function invoke(options: InvokeOptions): Promise<InvokeResult> {
+  const { run } = await import("../src/cli.js");
+  const stdout = captureStream();
+  const stderr = captureStream();
+  const exitCode = await run({
+    argv: ["node", "wallet-inntris", options.operation],
+    env: baseEnv({ INNTRIS_DOWNSTREAM_WALLET_BIN: DOWNSTREAM_BIN, ...options.env }),
+    stdin: makeStdin(options.stdin ?? ""),
+    stdout,
+    stderr,
+    ...(options.spawn === undefined ? {} : { spawnFn: options.spawn.fn }),
+    ...(options.core === undefined
+      ? {}
+      : { fetchImplementation: options.core.fetchImplementation }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.clock === undefined ? {} : { clock: options.clock }),
+    ...(options.randomUUID === undefined ? {} : { randomUUID: options.randomUUID }),
+  });
+  const text = stdout.text().trim();
+  let json: Record<string, unknown> = {};
+  try {
+    json = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    /* stdout is deliberately non-JSON in some negative tests */
+  }
+  return { exitCode, stdout: text, stderr: stderr.text(), json };
+}
+
+/** A valid `send-transaction` body used across the gating suites. */
+export const SEND_TX_INPUT = {
+  account: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  chain: "eip155:8453",
+  transaction: {
+    to: "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    value: "0x2386f26fc10000",
+    data: "0x",
+  },
+};
+
+export const DECISION_AUDIT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+export const CONSUMPTION_AUDIT_ID = "11111111-2222-4333-8444-999999999999";
+
+/** A Core that approves and confirms exact action-bound consumption. */
+export function approvingCore(
+  overrides: {
+    verifyStatus?: number;
+    verifyBody?: unknown;
+    tokenBody?: (body: Record<string, unknown>) => unknown;
+    onConsume?: () => void;
+  } = {},
+): FakeCore {
+  return fakeCore((path, body) => {
+    if (path === "verify") {
+      return {
+        status: overrides.verifyStatus ?? 200,
+        body: overrides.verifyBody ?? {
+          verdict: "approved",
+          verdict_reason: "All verification checks passed",
+          approval_token: "token-abc",
+          trust_score: 60,
+          audit_id: DECISION_AUDIT_ID,
+          timestamp: "2026-08-20T12:00:00Z",
+          limits_remaining: {},
+          idempotency_status: "new",
+        },
+      };
+    }
+    overrides.onConsume?.();
+    // Recompute the action hash from the supplied parameters exactly as Core
+    // does, so the binding assertions in the client are exercised for real
+    // rather than against a hard-coded echo.
+    const actionHash = computeActionHash({
+      agentId: String(body["agent_id"]),
+      actionType: String(body["action_type"]),
+      payload: body["payload"],
+      nonce: String(body["nonce"]),
+      timestamp: String(body["timestamp"]),
+    });
+    const defaultToken = {
+      valid: true,
+      verdict: "approved",
+      agent_id: body["agent_id"],
+      action_hash: actionHash,
+      expires_at: "2026-08-20T12:05:00Z",
+      action_hash_matches: true,
+      consumption_audit_id: CONSUMPTION_AUDIT_ID,
+      consumption_status: "consumed",
+      execution_ref: body["execution_ref"],
+      sandbox: false,
+    };
+    return {
+      status: 200,
+      body:
+        overrides.tokenBody === undefined
+          ? defaultToken
+          : overrides.tokenBody({ ...body, __action_hash: actionHash }),
+    };
+  });
 }

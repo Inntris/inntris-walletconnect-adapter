@@ -146,11 +146,7 @@ export class InntrisCoreClient {
     // recomputes the action hash from them and refuses if it does not match the
     // hash the token authorises, which is what binds this execution to this
     // approval rather than to some other approved action.
-    const consumeTimeout = deadline.reserve(
-      "Inntris /verify-token",
-      1,
-      this.options.coreTimeoutMs,
-    );
+    const consumeTimeout = deadline.reserve("Inntris /verify-token", 1, this.options.coreTimeoutMs);
     const consumption = await this.#post(
       "verify-token",
       {
@@ -175,9 +171,7 @@ export class InntrisCoreClient {
 
     const consumed = VerifyTokenResponseSchema.safeParse(consumption.body);
     if (!consumed.success) {
-      throw ProtocolError.internal(
-        "Inntris Core returned a malformed token-consumption response",
-      );
+      throw ProtocolError.internal("Inntris Core returned a malformed token-consumption response");
     }
 
     const data = consumed.data;

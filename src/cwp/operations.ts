@@ -10,12 +10,7 @@
  */
 
 /** Operations delegated straight to the downstream provider. */
-export const PASSTHROUGH_OPERATIONS = [
-  "accounts",
-  "balance",
-  "history",
-  "get-session",
-] as const;
+export const PASSTHROUGH_OPERATIONS = ["accounts", "balance", "history", "get-session"] as const;
 
 /** Operations that MUST traverse Inntris before the downstream provider runs. */
 export const GATED_OPERATIONS = [

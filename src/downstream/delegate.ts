@@ -134,11 +134,7 @@ export function delegate(params: {
       if (settled) return;
       settled = true;
       child.kill("SIGKILL");
-      reject(
-        ProtocolError.timeout(
-          `Downstream provider timed out after ${params.timeoutMs}ms`,
-        ),
-      );
+      reject(ProtocolError.timeout(`Downstream provider timed out after ${params.timeoutMs}ms`));
     }, params.timeoutMs);
     timer.unref?.();
 
