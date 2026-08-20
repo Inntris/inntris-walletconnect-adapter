@@ -347,3 +347,54 @@ describe("budget exhaustion fails closed", () => {
     expect(result.exitCode).toBe(ExitCode.TIMEOUT);
   });
 });
+
+describe("downstream failure after the approval was consumed", () => {
+  it("propagates the wallet's failure rather than masking it", async () => {
+    const spawn = fakeSpawn({
+      stdout: JSON.stringify({ error: "signing device unavailable", code: "NOT_CONNECTED" }),
+      exitCode: 5,
+    });
+    const core = approvingCore();
+    const result = await invoke({
+      operation: "send-transaction",
+      stdin: JSON.stringify(SEND_TX_INPUT),
+      spawn,
+      core,
+    });
+
+    expect(result.exitCode).toBe(5);
+    expect(result.json["code"]).toBe("NOT_CONNECTED");
+    expect(spawn.calls).toHaveLength(1);
+  });
+
+  it("says clearly that execution failed after authorisation was consumed", async () => {
+    const spawn = fakeSpawn({ stdout: "{}", exitCode: 1 });
+    const result = await invoke({
+      operation: "send-transaction",
+      stdin: JSON.stringify(SEND_TX_INPUT),
+      spawn,
+      core: approvingCore(),
+    });
+
+    expect(result.stderr).toMatch(/after authorisation/u);
+    expect(result.stderr).toContain(CONSUMPTION_AUDIT_ID);
+  });
+
+  it("does not re-consume or retry the token when the wallet times out", async () => {
+    const spawn = fakeSpawn({ delayMs: 5_000, stdout: "{}" });
+    const core = approvingCore();
+    const result = await invoke({
+      operation: "send-transaction",
+      stdin: JSON.stringify(SEND_TX_INPUT),
+      spawn,
+      core,
+      env: { INNTRIS_DOWNSTREAM_TIMEOUT_MS: "50" },
+    });
+
+    expect(result.exitCode).toBe(ExitCode.TIMEOUT);
+    expect(spawn.calls).toHaveLength(1);
+    // Exactly one authorisation and one consumption: no second attempt at either.
+    expect(core.calls.map((call) => call.path)).toEqual(["verify", "verify-token"]);
+    expect(result.stderr).toMatch(/approval token is spent/u);
+  });
+});
