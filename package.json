@@ -1,0 +1,43 @@
+{
+  "name": "@inntris/walletconnect-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Inntris CWP provider (wallet-inntris): a pre-execution authority adapter that places Inntris Core in the WalletConnect CLI Wallet Protocol execution path.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bin": {
+    "wallet-inntris": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "canonicalize": "3.0.0",
+    "tweetnacl": "1.0.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.33.0",
+    "@types/node": "24.2.1",
+    "eslint": "9.33.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "16.3.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.39.1",
+    "vitest": "3.2.7"
+  }
+}

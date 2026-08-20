@@ -1,0 +1,141 @@
+{
+  "_comment": "Phase 1B.1 JCS canonicalization vectors (RFC 8785 subset). Every language SDK MUST produce exactly the 'canonical' bytes and 'sha256' hex for the given 'input', or signatures will not verify under sig_version=3. See tests/fixtures/canonicalization/JCS_VECTORS.md.",
+  "jcs_spec": "https://www.rfc-editor.org/rfc/rfc8785",
+  "sig_version": 3,
+  "vectors": [
+    {
+      "name": "empty_object",
+      "description": "Empty object canonicalizes to {}",
+      "input": {},
+      "canonical": "{}",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "name": "empty_array",
+      "description": "Empty array canonicalizes to []",
+      "input": [],
+      "canonical": "[]",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "simple_ascii_keys_sorted",
+      "description": "ASCII keys must be reordered alphabetically",
+      "input": {
+        "c": 3,
+        "a": 1,
+        "b": 2
+      },
+      "canonical": "{\"a\":1,\"b\":2,\"c\":3}",
+      "sha256": "e6a3385fb77c287a712e7f406a451727f0625041823ecf23bea7ef39b2e39805"
+    },
+    {
+      "name": "integer_valued_float_becomes_int",
+      "description": "1.0 and 100.0 drop the trailing '.0' per ECMA-262 ToString",
+      "input": {
+        "whole": 1.0,
+        "hundred": 100.0,
+        "negative": -42.0
+      },
+      "canonical": "{\"hundred\":100,\"negative\":-42,\"whole\":1}",
+      "sha256": "319fcb60f1f2444acca2135644ac55ffe253f499beb81ce11663c26262eabe2e"
+    },
+    {
+      "name": "currency_two_decimals",
+      "description": "Decimal currency values preserve their fractional part",
+      "input": {
+        "amount": 49.99,
+        "tax": 0.05,
+        "total": 52.49
+      },
+      "canonical": "{\"amount\":49.99,\"tax\":0.05,\"total\":52.49}",
+      "sha256": "8044b4cc3803aef03b1ec223571232514497705f1896870747ce3f84b809fa6f"
+    },
+    {
+      "name": "negative_zero_collapses",
+      "description": "-0.0 must serialize as '0' — same as +0.0",
+      "input": {
+        "minus_zero": -0.0,
+        "plus_zero": 0.0
+      },
+      "canonical": "{\"minus_zero\":0,\"plus_zero\":0}",
+      "sha256": "b285944c169a04c8caebfef8b8f253cde5e61fe5f938ce442ce8eec5b3acbb09"
+    },
+    {
+      "name": "null_and_booleans",
+      "description": "JSON primitives",
+      "input": {
+        "deleted": null,
+        "active": true,
+        "archived": false
+      },
+      "canonical": "{\"active\":true,\"archived\":false,\"deleted\":null}",
+      "sha256": "3a75b796e3713b24188bd71a5c553fb58d161343a31b3304e09a2e6700a3df48"
+    },
+    {
+      "name": "unicode_string_value",
+      "description": "Non-ASCII string values pass through as UTF-8",
+      "input": {
+        "greeting": "héllo 🌍",
+        "lang": "fr"
+      },
+      "canonical": "{\"greeting\":\"héllo 🌍\",\"lang\":\"fr\"}",
+      "sha256": "40df4052ec312c6898190b4e191ff9bf4c41f46d10e88ef25e5a269d8dbd5e6e"
+    },
+    {
+      "name": "unicode_bmp_key_sort",
+      "description": "BMP-range non-ASCII keys sort after ASCII — 'α' > 'z' by code point",
+      "input": {
+        "α": 1,
+        "z": 2,
+        "a": 3
+      },
+      "canonical": "{\"a\":3,\"z\":2,\"α\":1}",
+      "sha256": "766c13c912fe418993f4f229c2f709da6493aa98c4c2ce1a220056012dd8a32e"
+    },
+    {
+      "name": "nested_structure",
+      "description": "Nested objects and arrays apply the rules recursively",
+      "input": {
+        "agent_id": "4f0e4fd5-5e2f-4e95-a2d5-78b0a7b0d66a",
+        "items": [
+          {
+            "sku": "B",
+            "qty": 2
+          },
+          {
+            "sku": "A",
+            "qty": 1
+          }
+        ],
+        "meta": {
+          "z": true,
+          "a": null
+        }
+      },
+      "canonical": "{\"agent_id\":\"4f0e4fd5-5e2f-4e95-a2d5-78b0a7b0d66a\",\"items\":[{\"qty\":2,\"sku\":\"B\"},{\"qty\":1,\"sku\":\"A\"}],\"meta\":{\"a\":null,\"z\":true}}",
+      "sha256": "e4ec157cfb00ff98ddc0c3556fdcdeaf0a0f0b23de13cf295eb4a83c3f7a9236"
+    },
+    {
+      "name": "control_characters_escaped",
+      "description": "Control characters use \\uXXXX escapes; \\n \\t etc. use short forms",
+      "input": {
+        "ctrl": "a\nb\tc\u0001d"
+      },
+      "canonical": "{\"ctrl\":\"a\\nb\\tc\\u0001d\"}",
+      "sha256": "2d002b495d1d563fff3aece844832c5c2af393ba9df087c8db782433dd24c16d"
+    },
+    {
+      "name": "financial_transaction_payload",
+      "description": "Realistic payload matching the demo script's /verify request",
+      "input": {
+        "amount": 49.99,
+        "currency": "USD",
+        "recipient": "vendor_12345",
+        "description": "Demo payment for API services",
+        "risk_score": 0.15
+      },
+      "canonical": "{\"amount\":49.99,\"currency\":\"USD\",\"description\":\"Demo payment for API services\",\"recipient\":\"vendor_12345\",\"risk_score\":0.15}",
+      "sha256": "3a1b8aeb4ce0f2d73dbf795ae176e790c35603c6fc1dff3a9bb56f457ab1f76a"
+    }
+  ]
+}

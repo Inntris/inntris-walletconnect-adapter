@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+// Downstream CWP provider stub. Real executable so the adapter's binary
+// validation runs for real; behaviour is driven by env vars in tests that
+// spawn it, and most unit tests inject a fake spawn instead.
+const op = process.argv[2];
+if (op === "info") {
+  process.stdout.write(
+    JSON.stringify({
+      name: "downstream-stub",
+      version: "0.0.1",
+      rdns: "test.downstream.stub",
+      capabilities: ["accounts", "balance", "sign-message", "send-transaction"],
+      chains: ["eip155:8453"],
+    }) + "\n",
+  );
+  process.exit(0);
+}
+process.stderr.write("DOWNSTREAM WALLET INVOKED\n");
+process.stdout.write(JSON.stringify({ transactionHash: "0xstub" }) + "\n");

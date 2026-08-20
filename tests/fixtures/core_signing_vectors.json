@@ -1,0 +1,94 @@
+{
+  "_comment": "Generated from Inntris Core api/crypto.py (sig_version=3) at MTP master. Regenerate with scripts/generate-core-vectors.sh if Core's signing envelope changes.",
+  "agent_id": "11111111-2222-3333-4444-555555555555",
+  "seed_b64": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+  "sig_version": 3,
+  "cases": [
+    {
+      "name": "send_transaction_base",
+      "action_type": "wallet_transaction",
+      "payload": {
+        "platform": "walletconnect-cwp",
+        "rail": "walletconnect_cwp",
+        "trust_level": "external_cwp_provider",
+        "resource": "wallet",
+        "resource_id": "eip155:8453:0xAAAA",
+        "operation": "send-transaction",
+        "payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "request_ref": "wc:abc:verify",
+        "downstream_provider": "companion",
+        "risk_flags": [
+          "wallet",
+          "signing",
+          "financial"
+        ],
+        "policy_context": {
+          "cwp_operation": "send-transaction"
+        },
+        "chain": "eip155:8453",
+        "account": "0xAAAA",
+        "recipient": "0xBBBB"
+      },
+      "nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "2026-08-20T12:00:00Z",
+      "payload_hash": "e7f5c7c4627934729f67896e35d0958f07ef31327f7330502835f62eb761ee52",
+      "action_hash": "202004370ba64045e64b1cf2ae3fc0857dd796352ee78df7b69c0e080a9842be",
+      "signature": "LVmFXY1kaQ3RYaG5p1DGFjMb9QoRsb3vmF9eCzzWTWDyRks3YK68ww+CbST27UbCDPxi2j7PhdFmqATfv2tgAw=="
+    },
+    {
+      "name": "sign_message_no_chain",
+      "action_type": "wallet_signature",
+      "payload": {
+        "platform": "walletconnect-cwp",
+        "rail": "walletconnect_cwp",
+        "trust_level": "external_cwp_provider",
+        "resource": "wallet",
+        "resource_id": "wallet:0xCCCC",
+        "operation": "sign-message",
+        "payload_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "request_ref": "wc:def:verify",
+        "downstream_provider": "companion",
+        "risk_flags": [
+          "wallet",
+          "signing"
+        ],
+        "policy_context": {
+          "cwp_operation": "sign-message"
+        },
+        "account": "0xCCCC"
+      },
+      "nonce": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "timestamp": "2026-08-20T12:00:00.123000Z",
+      "payload_hash": "41b94502bbaf89c01c611c8756f785a856a8576282304c2acd581735d9e1a28c",
+      "action_hash": "b9affb5c56c62c88a9f92098fc88fec4a36b91f65910cb43bee0b45b4926d736",
+      "signature": "iQdvDKHXvvDHr4ZteAvMPPhNYJIepFoJU1HNA7tJdkbKsYKaX3KYe1/dUVtH/Z0MlvTPH49Y2Li0ifBY2fJACg=="
+    },
+    {
+      "name": "generate_admin_no_account",
+      "action_type": "admin_action",
+      "payload": {
+        "platform": "walletconnect-cwp",
+        "rail": "walletconnect_cwp",
+        "trust_level": "external_cwp_provider",
+        "resource": "wallet",
+        "resource_id": "wallet:*",
+        "operation": "generate",
+        "payload_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "request_ref": "wc:ghi:verify",
+        "downstream_provider": "companion",
+        "risk_flags": [
+          "wallet",
+          "admin"
+        ],
+        "policy_context": {
+          "cwp_operation": "generate"
+        }
+      },
+      "nonce": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "timestamp": "2026-08-20T12:00:00Z",
+      "payload_hash": "a9ac1b044d567a23a730abeee5c8b07c2c384fa571b785119d89eb91cd28780f",
+      "action_hash": "056ebfdc94bac95b85b65fdb18dee842a8f42b57b57ed7afc4a1e535eb5bdc8a",
+      "signature": "82gdfTOzKphJwcnaC1vwEBisgvaYFoDn3bCDcb8YPohPDSzdYvKH9mKDRLul6qtpvN/4GwsBXE3mG3ONIVv9CQ=="
+    }
+  ]
+}
