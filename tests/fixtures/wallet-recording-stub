@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+/**
+ * Downstream CWP provider stub for the integration suite.
+ *
+ * Every invocation is appended to the file named by DOWNSTREAM_MARKER_FILE, so
+ * a BLOCK test can assert on the absence of the file rather than on the
+ * absence of a log line. The marker is the evidence that the wallet process
+ * really did not run.
+ */
+import { appendFileSync } from "node:fs";
+
+const operation = process.argv[2];
+const marker = process.env.DOWNSTREAM_MARKER_FILE;
+
+function record(payload) {
+  if (marker) appendFileSync(marker, `${JSON.stringify(payload)}\n`);
+}
+
+if (operation === "info") {
+  process.stdout.write(
+    JSON.stringify({
+      name: "recording-stub",
+      version: "0.0.1",
+      rdns: "test.inntris.recording-stub",
+      capabilities: [
+        "accounts",
+        "balance",
+        "sign-message",
+        "sign-typed-data",
+        "sign-transaction",
+        "send-transaction",
+      ],
+      chains: ["eip155:8453", "eip155:1"],
+    }) + "\n",
+  );
+  process.exit(0);
+}
+
+let stdin = "";
+process.stdin.setEncoding("utf-8");
+process.stdin.on("data", (chunk) => {
+  stdin += chunk;
+});
+process.stdin.on("end", () => {
+  record({ operation, stdin });
+  process.stderr.write("DOWNSTREAM WALLET INVOKED\n");
+  if (operation === "accounts") {
+    process.stdout.write(
+      JSON.stringify({
+        accounts: [{ chain: "eip155:8453", address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }],
+      }) + "\n",
+    );
+  } else if (operation === "send-transaction") {
+    process.stdout.write(JSON.stringify({ transactionHash: "0xDOWNSTREAMTXHASH" }) + "\n");
+  } else {
+    process.stdout.write(JSON.stringify({ signature: "0xDOWNSTREAMSIGNATURE" }) + "\n");
+  }
+});

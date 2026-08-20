@@ -351,7 +351,7 @@ export function invocationDeadline(
 }
 
 export async function run(deps: CliDependencies): Promise<number> {
-  const logger = createLogger(deps.stderr);
+  const logger = createLogger(deps.stderr, deps.env["INNTRIS_AUDIT_LOG"]);
   const clock = deps.clock ?? (() => performance.now());
 
   let response: StdoutResponse;
