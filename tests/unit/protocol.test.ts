@@ -1,5 +1,3 @@
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { run } from "../../src/cli.js";
@@ -10,46 +8,17 @@ import {
   GATED_OPERATIONS,
   callerCeilingMs,
 } from "../../src/cwp/operations.js";
-import { baseEnv, captureStream, fakeCore, fakeSpawn, makeStdin } from "../helpers.js";
-
-const DOWNSTREAM_BIN = join(import.meta.dirname, "..", "fixtures", "wallet-downstream-stub");
-
-interface RunResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-  json: Record<string, unknown>;
-}
-
-async function invoke(options: {
-  operation: string;
-  stdin?: string;
-  env?: NodeJS.ProcessEnv;
-  spawn?: ReturnType<typeof fakeSpawn>;
-  core?: ReturnType<typeof fakeCore>;
-}): Promise<RunResult> {
-  const stdout = captureStream();
-  const stderr = captureStream();
-  const exitCode = await run({
-    argv: ["node", "wallet-inntris", options.operation],
-    env: baseEnv({ INNTRIS_DOWNSTREAM_WALLET_BIN: DOWNSTREAM_BIN, ...options.env }),
-    stdin: makeStdin(options.stdin ?? ""),
-    stdout,
-    stderr,
-    ...(options.spawn === undefined ? {} : { spawnFn: options.spawn.fn }),
-    ...(options.core === undefined
-      ? {}
-      : { fetchImplementation: options.core.fetchImplementation }),
-  });
-  const text = stdout.text().trim();
-  let json: Record<string, unknown> = {};
-  try {
-    json = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    /* left empty for tests asserting non-JSON stdout */
-  }
-  return { exitCode, stdout: text, stderr: stderr.text(), json };
-}
+import { hashCanonical } from "../../src/cwp/input.js";
+import {
+  approvingCore,
+  baseEnv,
+  captureStream,
+  DOWNSTREAM_BIN,
+  fakeCore,
+  fakeSpawn,
+  invoke,
+  makeStdin,
+} from "../helpers.js";
 
 describe("operation surface", () => {
   it("is the union of pass-through and gated operations", () => {
@@ -206,5 +175,52 @@ describe("downstream failure relaying", () => {
     });
     expect(result.exitCode).toBe(ExitCode.GENERAL_ERROR);
     expect(String(result.json["error"])).toMatch(/absolute path/iu);
+  });
+});
+
+describe("operations that legitimately carry no input", () => {
+  it("accepts generate with an empty body and still gates it through Inntris", async () => {
+    const spawn = fakeSpawn({ stdout: JSON.stringify({ address: "0xNEW" }) });
+    const core = approvingCore();
+    const result = await invoke({ operation: "generate", stdin: "", spawn, core });
+
+    expect(result.exitCode).toBe(ExitCode.SUCCESS);
+    expect(core.calls.map((call) => call.path)).toEqual(["verify", "verify-token"]);
+    expect(spawn.calls).toHaveLength(1);
+    // The empty body is forwarded as it arrived, not as a synthesised "{}".
+    expect(spawn.calls[0]?.stdin).toBe("");
+  });
+
+  it("commits the empty body as {} in the signed payload", async () => {
+    const core = approvingCore();
+    await invoke({
+      operation: "generate",
+      stdin: "",
+      spawn: fakeSpawn({ stdout: "{}" }),
+      core,
+    });
+    const payload = core.calls[0]?.body["payload"] as Record<string, unknown>;
+    expect(payload["payload_hash"]).toBe(hashCanonical({}));
+    expect(payload["resource_id"]).toBe("wallet:*");
+    expect(core.calls[0]?.body["action_type"]).toBe("admin_action");
+  });
+
+  it("still rejects an empty body for an operation that needs one", async () => {
+    const spawn = fakeSpawn();
+    const core = approvingCore();
+    const result = await invoke({ operation: "send-transaction", stdin: "", spawn, core });
+
+    expect(result.exitCode).toBe(ExitCode.GENERAL_ERROR);
+    expect(result.json["code"]).toBe("INVALID_INPUT");
+    expect(core.calls).toHaveLength(0);
+    expect(spawn.calls).toHaveLength(0);
+  });
+
+  it("still rejects malformed JSON for generate", async () => {
+    const spawn = fakeSpawn();
+    const result = await invoke({ operation: "generate", stdin: "{oops", spawn });
+    expect(result.exitCode).toBe(ExitCode.GENERAL_ERROR);
+    expect(result.json["code"]).toBe("INVALID_INPUT");
+    expect(spawn.calls).toHaveLength(0);
   });
 });

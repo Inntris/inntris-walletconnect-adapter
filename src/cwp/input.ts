@@ -18,6 +18,12 @@ export interface CwpInvocationInput {
   raw: Buffer;
   /** Parsed exactly once. Never re-serialised for delegation. */
   parsed: unknown;
+  /**
+   * Whether an empty body is a valid request for this operation. Carried on the
+   * input so the pre-spawn recheck re-parses under exactly the same rule as the
+   * original parse — a differing rule would be a false integrity failure.
+   */
+  allowEmpty: boolean;
 }
 
 /** Read stdin to completion, retaining the original bytes. */
@@ -49,15 +55,17 @@ export function hashCanonical(value: unknown): string {
 }
 
 /**
- * Parse the retained bytes into the single object the invocation reasons about.
+ * Parse the retained bytes into the object the invocation reasons about.
  *
- * Gated operations always carry a JSON object on stdin. Empty input or a
- * non-object body is rejected here rather than being passed to a wallet as an
- * un-classifiable request.
+ * An empty body is accepted only for operations that legitimately take none
+ * (`generate`), where it means the empty object. Everywhere else empty input,
+ * malformed JSON, or a non-object body is rejected here rather than passed to a
+ * wallet as an un-classifiable request.
  */
-export function parseCwpInput(raw: Buffer): CwpInvocationInput {
+export function parseRequestBody(raw: Buffer, allowEmpty: boolean): unknown {
   const text = raw.toString("utf-8").trim();
   if (text.length === 0) {
+    if (allowEmpty) return {};
     throw ProtocolError.invalidInput("No JSON input received on stdin");
   }
   let parsed: unknown;
@@ -69,7 +77,11 @@ export function parseCwpInput(raw: Buffer): CwpInvocationInput {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw ProtocolError.invalidInput("CWP input must be a JSON object");
   }
-  return { raw, parsed };
+  return parsed;
+}
+
+export function parseCwpInput(raw: Buffer, allowEmpty = false): CwpInvocationInput {
+  return { raw, parsed: parseRequestBody(raw, allowEmpty), allowEmpty };
 }
 
 /**
@@ -90,7 +102,7 @@ export function parseCwpInput(raw: Buffer): CwpInvocationInput {
 export function assertDelegationIntegrity(input: CwpInvocationInput, authorisedHash: string): void {
   let reparsedHash: string;
   try {
-    reparsedHash = hashCanonical(JSON.parse(input.raw.toString("utf-8")));
+    reparsedHash = hashCanonical(parseRequestBody(input.raw, input.allowEmpty));
   } catch {
     throw ProtocolError.internal(
       "Pre-spawn integrity check failed: retained stdin buffer is no longer parseable",

@@ -40,6 +40,16 @@ export const SUPPORTED_CWP_OPERATIONS: readonly SupportedOperation[] = [
   ...GATED_OPERATIONS,
 ];
 
+/**
+ * Gated operations that legitimately carry no stdin body.
+ *
+ * `generate` creates a key and takes no input, so empty stdin is a valid
+ * request rather than a malformed one. Every other gated operation needs a body
+ * to be meaningful, and an empty one is rejected locally rather than sent to
+ * Inntris to be denied for missing fields.
+ */
+export const OPERATIONS_WITHOUT_INPUT: ReadonlySet<string> = new Set(["generate"]);
+
 const PASSTHROUGH_SET: ReadonlySet<string> = new Set(PASSTHROUGH_OPERATIONS);
 const GATED_SET: ReadonlySet<string> = new Set(GATED_OPERATIONS);
 const SUPPORTED_SET: ReadonlySet<string> = new Set(SUPPORTED_CWP_OPERATIONS);

@@ -8,6 +8,7 @@ import {
   isGatedOperation,
   isPassthroughOperation,
   isSupportedOperation,
+  OPERATIONS_WITHOUT_INPUT,
 } from "./cwp/operations.js";
 import type { WalletErrorCode } from "./cwp/protocol.js";
 import { Deadline, ExitCode, ProtocolError } from "./cwp/protocol.js";
@@ -197,7 +198,7 @@ async function handleGated(
 ): Promise<StdoutResponse> {
   const { parseCwpInput, readStdinBuffer } = await import("./cwp/input.js");
   const raw = await readStdinBuffer(deps.stdin);
-  const input = parseCwpInput(raw);
+  const input = parseCwpInput(raw, OPERATIONS_WITHOUT_INPUT.has(operation));
   return authoriseAndDelegate(deps, logger, operation, deadline, input);
 }
 
