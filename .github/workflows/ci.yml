@@ -1,0 +1,79 @@
+# Automated gates for the checks this repository already defines.
+#
+# `npm run check` is the canonical validation and stays the single source of
+# truth: format, lint at zero warnings, typecheck, the full test suite, and the
+# build. This workflow runs it rather than restating any of those steps, so a
+# gate can never drift from what a contributor runs locally.
+#
+# Third-party actions are pinned to immutable commit SHAs. A tag is mutable and
+# can be repointed at new code by whoever owns it; for a repository whose tests
+# are its security evidence, the gate itself must not be re-pointable.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Read-only. Nothing here comments, pushes, publishes, or deploys, so no other
+# scope is required.
+permissions:
+  contents: read
+
+# Supersede in-flight runs for the same ref: only the newest commit's result is
+# meaningful on a PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (format, lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this workflow talks back to git; leaving the token in
+          # .git/config would only widen what a later step could reach.
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Pinned rather than resolved from `engines` (">=22.0.0"), which would
+          # drift to whatever major is newest at run time.
+          node-version: "22"
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Run the repository's canonical validation
+        run: npm run check
+
+  dependency-security:
+    name: Dependency security (npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      # Separate from `quality` so a newly published advisory is distinguishable
+      # from a code failure at a glance, and so either can be required on its own.
+      - name: Fail on high or critical advisories
+        run: npm audit --audit-level=high
