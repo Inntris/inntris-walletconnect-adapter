@@ -80,7 +80,17 @@ before `/verify`, before `/verify-token`, and before the spawn. Per-call
 timeouts stay bounded regardless: Core keeps its fixed `INNTRIS_CORE_TIMEOUT_MS`
 even on a 179-second deadline, and only the downstream slice expands.
 
-Insufficient remaining time fails closed with exit 4.
+`INNTRIS_CORE_TIMEOUT_MS` defaults to 10000 ms. It is sized against observed
+production latency — Core `/verify` has answered correctly in ~3.7 s under load
+— rather than against the caller's ceiling, which is 180 s for
+`send-transaction`. Each Core call is capped at
+`min(deadline_remaining, INNTRIS_CORE_TIMEOUT_MS)`, so on the operations that
+inherit the 10 s default ceiling the deadline, not this cap, is the binding
+constraint.
+
+Insufficient remaining time fails closed with exit 4, and so does a Core call
+that exceeds its cap: a wider cap changes how long the adapter waits for a
+decision, never what it accepts as one.
 
 ## `info` and the discovery budget
 
