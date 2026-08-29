@@ -130,6 +130,8 @@ export interface FakeCore {
 export type CoreHandler = (
   path: string,
   body: Record<string, unknown>,
+  /** The per-call abort signal, so a handler can model a slow Core faithfully. */
+  signal: AbortSignal | null | undefined,
 ) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
 /** A Core stand-in that records the call order alongside the responses. */
@@ -142,7 +144,7 @@ export function fakeCore(handler: CoreHandler): FakeCore {
       unknown
     >;
     calls.push({ path, body });
-    const result = await handler(path, body);
+    const result = await handler(path, body, init.signal);
     return new Response(JSON.stringify(result.body), {
       status: result.status,
       headers: { "content-type": "application/json" },

@@ -20,7 +20,7 @@ tested.
 | 11  | Existing `financial_transaction` behaviour is unchanged           | wallet checks scoped to `wallet_*` action types             | MTP `test_wallet_policy.py::TestExistingBehaviourUnchanged`                     |
 | 12  | Wallet policy cannot destroy unrelated agent metadata             | reuses the existing JSONB merge                             | MTP `PATCH /admin/agents` merge path                                            |
 | 13  | Rail and trust-boundary identifiers are inside the signed payload | `buildWalletAction`                                         | `action-binding.test.ts`, integration                                           |
-| 14  | Insufficient time budget fails closed                             | `Deadline.reserve` throws exit 4                            | `gating.test.ts`                                                                |
+| 14  | Insufficient time budget fails closed                             | `Deadline.reserve` throws exit 4                            | `gating.test.ts`, `core-timeout.test.ts`                                        |
 | 15  | `info` never depends on Core availability                         | `info` reads no Core config and makes no Core call          | `info.test.ts`                                                                  |
 | 16  | Advertised capabilities ⊆ `SUPPORTED_CWP_OPERATIONS`              | one shared constant; intersection on all three paths        | `info.test.ts`                                                                  |
 | 17  | The adapter maintains no spend ledger                             | reservation and consumption stay in Core                    | by construction                                                                 |

@@ -7,7 +7,23 @@ import { ProtocolError } from "./cwp/protocol.js";
 /** Bin name this package installs as, and the name it must never delegate to. */
 export const ADAPTER_BIN_NAME = "wallet-inntris";
 
-const DEFAULT_CORE_TIMEOUT_MS = 2_500;
+/**
+ * Per-call cap on each Inntris Core request.
+ *
+ * Sized against observed production latency, not against a round number: Core
+ * `/verify` has legitimately answered in ~3.7 s under load while returning the
+ * correct decision, so the previous 2.5 s default aborted authorised calls
+ * locally before Core replied. The caller's ceiling for the slowest gated
+ * operation is 180 s (`CALLER_CEILING_MS`), so 10 s is still an order of
+ * magnitude tighter than the protocol allows, and the invocation `Deadline`
+ * remains the binding constraint on operations with the 10 s default ceiling.
+ *
+ * Raising this cap changes only how long the adapter is willing to *wait* for
+ * an answer. It does not change what counts as an answer: a Core call that
+ * exceeds the cap still fails closed with exit 4, and the downstream wallet is
+ * still never spawned without a consumed, action-bound approval.
+ */
+const DEFAULT_CORE_TIMEOUT_MS = 10_000;
 const DEFAULT_PROVIDER_NAME = "companion";
 const DEFAULT_RECEIPT_BASE_URL = "https://inntris.com/verify";
 
